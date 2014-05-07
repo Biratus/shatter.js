@@ -1,2 +1,0 @@
-DOM Example
-Canvas Example
