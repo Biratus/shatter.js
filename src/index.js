@@ -1,6 +1,6 @@
 /*!
  * Shatter.js: JavaScript image shattering
- * @version 0.1.3
+ * @version 1.0.0
  * @license MIT License https://github.com/cdgugler/shatter.js/raw/dev/LICENSE.md
  * @author Cory Gugler - cory@addlime.com
  */
@@ -11,6 +11,8 @@ import { voronoi } from "d3-voronoi";
 exports.Shatter = function (opts, cb) {
     return new Shatter (opts, cb);
 }
+
+// TODO update this - changed to option object and callback
 /**
  * Creates a new Shatter object.
  * @constructor
@@ -152,24 +154,29 @@ Shatter.prototype.spliceImage = function (polygons, img, cb) {
     tempCtx.save();
 
     // loop through each polygon
+    var processed = 0;
     polygons.forEach(function (polygon) {
         // Draw clipping path for the current polygon on the 2d context
-        var tempBigImage = Shatter.prototype.getClippedImage(polygon, tempCtx, tempCanvas, img);
-        var croppedImage = Shatter.prototype.getCroppedImage(polygon, tempBigImage);
+        Shatter.prototype.getClippedImage(polygon, tempCtx, tempCanvas, img, (clippedImage) => {
+            // TODO Reuse canvas?
+            Shatter.prototype.getCroppedImage(polygon, clippedImage, (croppedImage) => {
+                processed++;
+                imageList.push({image: croppedImage,
+                                x: polygon.minX,
+                                y: polygon.minY,
+                                points: polygon.points});
+                croppedImage = null; // clean up
+                tempCtx.restore();
+                tempCtx.clearRect(0,0,250,250);
+                tempCtx.save();
 
-        imageList.push({image: croppedImage,
-                        x: polygon.minX,
-                        y: polygon.minY,
-                        points: polygon.points});
-        croppedImage = null; // clean up
-        tempCtx.restore();
-        tempCtx.clearRect(0,0,250,250);
-        tempCtx.save();
-        return;
+                if (processed == polygons.length) {
+                    tempCanvas = null;
+                    cb(imageList);
+                }
+            });
+        });
     });
-    tempCanvas = null;
-
-    cb(imageList);
 };
 
 /**
@@ -180,8 +187,15 @@ Shatter.prototype.spliceImage = function (polygons, img, cb) {
  *
  * @returns {object} - The clipped image
  */
-Shatter.prototype.getClippedImage = function(polygon, ctx, tempCanvas, img) {
+Shatter.prototype.getClippedImage = function(polygon, ctx, tempCanvas, img, cb) {
     // loop through each pair of coordinates
+    // TODO REUSING CANVAS NOT WORKING NOW -> DUPED
+    var tempCanvas = document.createElement('canvas');
+    tempCanvas.width = img.width;
+    tempCanvas.height = img.height;
+    var ctx = tempCanvas.getContext("2d");
+    ctx.save();
+
     polygon.forEach(function (coordinatePair, index, polygon) {
         // check if first pair of coordinates and start path
         if (index === 0) {
@@ -202,10 +216,12 @@ Shatter.prototype.getClippedImage = function(polygon, ctx, tempCanvas, img) {
     // draw the original image onto the canvas
     ctx.drawImage(img, 0, 0);
     // save clipped image
-    var tempBigImage = img.cloneNode();
+    var tempBigImage = new Image();
+    tempBigImage.onload = function () {
+        cb(tempBigImage);
+    }
     tempBigImage.src = tempCanvas.toDataURL("image/png");
 
-    return tempBigImage;
 };
 
 /**
@@ -215,7 +231,7 @@ Shatter.prototype.getClippedImage = function(polygon, ctx, tempCanvas, img) {
  *
  * @returns {object} - The cropped image
  */
-Shatter.prototype.getCroppedImage = function (polygon, tempBigImage) {
+Shatter.prototype.getCroppedImage = function (polygon, tempBigImage, cb) {
         // now crop the image by drawing on a new canvas and saving it
         var imgHeight = polygon.maxY - polygon.minY,
             imgWidth = polygon.maxX - polygon.minX;
@@ -224,11 +240,12 @@ Shatter.prototype.getCroppedImage = function (polygon, tempBigImage) {
         cropCanvas.height = imgHeight;
         var cropCtx = cropCanvas.getContext("2d");
         cropCtx.drawImage(tempBigImage, -polygon.minX, -polygon.minY);
-        var saveImage = tempBigImage.cloneNode();
+        var saveImage = new Image();
+        saveImage.onload = function () {
+            cb(saveImage);
+            cropCanvas = null;
+        }
         saveImage.src = cropCanvas.toDataURL("image/png");
-        cropCanvas = null;
-
-        return saveImage;
 };
 
 /**

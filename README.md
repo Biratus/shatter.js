@@ -5,6 +5,10 @@ image with a [Voronoi diagram](http://en.wikipedia.org/wiki/Voronoi_diagram).
 
 Uses a custom build of [D3.js](https://github.com/mbostock/d3) to generate the Voronoi diagram used to split up the given image.
 
+## Updates to v1.0.0
+
+Breaking changes, documentation to follow.
+
 ## Install
 
 Get dependencies:
